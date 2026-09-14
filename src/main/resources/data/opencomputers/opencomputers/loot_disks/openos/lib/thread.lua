@@ -107,7 +107,7 @@ function box_thread:attach(parent)
   local proc = process.info(parent)
   local mt = assert(getmetatable(self), "thread panic: no metadata")
   if not proc then return nil, "thread failed to attach, process not found" end
-  if mt.attached == proc then return self end -- already attached
+  if mt.attached.data == proc.data then return self end -- already attached
 
   -- remove from old parent
   local waiting_handler
@@ -265,7 +265,6 @@ function thread.create(fp, ...)
     local old_status = t:status()
     mt.__status = "dead"
     process.removeHandle(t, mt.attached)
-    process.removeHandle(mt.process, t)
     if old_status ~= "dead" then
       event.push("thread_exit")
     end
