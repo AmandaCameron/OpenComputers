@@ -6,7 +6,9 @@ import li.cil.oc.api.network.SidedComponent;
 import li.cil.oc.api.network.SidedEnvironment;
 import li.cil.oc.common.capabilities.CapabilitySidedComponent;
 import li.cil.oc.common.blockentity.BlockEntityTypes;
+import li.cil.oc.common.init.OCItems;
 import li.cil.oc.common.item.traits.Chargeable;
+import li.cil.oc.common.capabilities.TankUpgradeFluidHandler;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.Direction;
 import net.minecraft.world.Container;
@@ -38,6 +40,11 @@ public final class EventHandlerHelper {
                 Capabilities.FluidHandler.BLOCK,
                 BlockEntityTypes.ROBOT.get(),
                 (be, ignored) -> be
+        );
+        event.registerItem(
+                Capabilities.FluidHandler.ITEM,
+                (stack, ignored) -> new TankUpgradeFluidHandler(stack),
+                OCItems.TankUpgrade().get()
         );
         BuiltInRegistries.ITEM.forEach(item -> {
             if (item instanceof Chargeable chargeable) {
