@@ -45,7 +45,7 @@ public final class VillageContent {
 
     public static final DeferredHolder<PoiType, PoiType> IT_NERD_POI =
             POI_TYPES.register("it_nerd", () -> new PoiType(
-                    ImmutableSet.copyOf(OCBlocks.CaseTier3().get().getStateDefinition().getPossibleStates()),
+                    ImmutableSet.copyOf(OCBlocks.Assembler().get().getStateDefinition().getPossibleStates()),
                     1,
                     1));
 
