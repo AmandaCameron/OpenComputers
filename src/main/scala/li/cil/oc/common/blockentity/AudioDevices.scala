@@ -95,7 +95,7 @@ object AudioRouter {
     while (pending.nonEmpty && visited.size <= MaxCables) {
       val current = pending.dequeue()
       Direction.values.foreach { direction =>
-        val next = current.relative(direction)
+        val next = li.cil.oc.util.BlockPosHelper.relative(current, direction)
         if (!visited(next)) level.getBlockEntity(next) match {
           case _: AudioCable => visited += next; pending.enqueue(next)
           case speaker: Speaker => visited += next; speakers += speaker
