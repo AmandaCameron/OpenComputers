@@ -39,6 +39,22 @@ object Audio {
 
   private var disableAudio = false
 
+  /** Convert a physical packet position into the client's local OpenAL space. */
+  def localAudioPosition(physical: Vec3): Vec3 = {
+    val mc = Minecraft.getInstance
+    if (mc == null || mc.player == null || mc.level == null) physical
+    else {
+      val listener = mc.player.position()
+      listener.add(physical.subtract(SableCompat.physicalPosition(mc.level, listener)))
+    }
+  }
+
+  def physicalGain(physical: Vec3, distance: Double): Double = {
+    val mc = Minecraft.getInstance
+    if (mc == null || mc.player == null || mc.level == null) 0
+    else math.max(0, 1 - SableCompat.physicalPosition(mc.level, mc.player.position()).distanceTo(physical) / distance)
+  }
+
   /**
     * Run OpenAL work on Minecraft's sound thread, but only while its OpenAL
     * context is ready. The sound executor is created before the sound engine
@@ -64,8 +80,14 @@ object Audio {
 
     runOnSoundEngine {
       try {
+        // LWJGL's OpenAL bindings pass the buffer address directly to the
+        // native driver. A heap ByteBuffer (ByteBuffer.wrap) is not valid for
+        // that call and can crash the JVM in nalBufferData on Windows.
+        val nativePcm = BufferUtils.createByteBuffer(pcm.length)
+        nativePcm.put(pcm)
+        nativePcm.flip()
         sources.synchronized {
-          sources += new Source(x, y, z, ByteBuffer.wrap(pcm), gain)
+          sources += new Source(x, y, z, nativePcm, gain)
         }
       } catch {
         case e: OpenALException =>
@@ -76,6 +98,45 @@ object Audio {
   
   def play(x: Float, y: Float, z: Float, frequencyInHz: Int, durationInMilliseconds: Int): Unit = {
     play(x, y, z, ".", frequencyInHz, durationInMilliseconds)
+  }
+
+  def playWave(x: Float, y: Float, z: Float, mode: Int, frequency: Int, durationMillis: Int, delayMillis: Int,
+               requestedGain: Float, fmFrequency: Int, fmIntensity: Float, amFrequency: Int,
+               attack: Int, decay: Int, sustain: Float, release: Int): Unit = {
+    val mc = Minecraft.getInstance
+    if (mc == null || mc.player == null) return
+    // Wave packets carry a physical position. This keeps sounds attached to
+    // moving Sable sublevels while retaining OpenAL's local listener space.
+    val physical = new Vec3(x, y, z)
+    val gain = physicalGain(physical, maxDistance).toFloat * volume * requestedGain.max(0).min(1)
+    if (gain <= 0 || amplitude <= 0) return
+    val delay = delayMillis.max(0).min(16000)
+    val duration = durationMillis.max(50).min(5000)
+    val samples = (delay + duration) * sampleRate / 1000
+    val data = Array.fill[Byte](samples)(127.toByte)
+    val start = delay * sampleRate / 1000
+    var phase = 0.0; var fmPhase = 0.0; var amPhase = 0.0
+    for (i <- 0 until duration * sampleRate / 1000 if start + i < data.length) {
+      val elapsed = i * 1000.0 / sampleRate
+      val fm = if (fmFrequency > 0) math.sin(fmPhase * 2 * math.Pi) * fmIntensity * fmFrequency else 0
+      val value = mode match {
+        case 1 => math.sin(phase * 2 * math.Pi)
+        case 2 => 1 - 4 * math.abs(phase - 0.5)
+        case 3 => 2 * phase - 1
+        case 4 => if (scala.util.Random.nextBoolean()) 1 else -1
+        case _ => if (phase < 0.5) 1 else -1
+      }
+      val attackGain = if (attack > 0 && elapsed < attack) elapsed / attack else 1.0
+      val decayGain = if (decay > 0 && elapsed >= attack && elapsed < attack + decay) 1 - (1 - sustain) * (elapsed - attack) / decay else sustain
+      val releaseGain = if (release > 0 && elapsed > duration - release) math.max(0, (duration - elapsed) / release) else 1.0
+      val amGain = if (amFrequency > 0) 0.5 + 0.5 * math.sin(amPhase * 2 * math.Pi) else 1.0
+      data(start + i) = (127 + value * amplitude * attackGain * decayGain * releaseGain * amGain).toByte
+      phase = (phase + math.max(20, math.min(2000, frequency + fm)) / sampleRate) % 1.0
+      fmPhase = (fmPhase + math.max(20, fmFrequency) / sampleRate) % 1.0
+      amPhase = (amPhase + math.max(20, amFrequency) / sampleRate) % 1.0
+    }
+    val local = localAudioPosition(physical)
+    play(local.x.toFloat, local.y.toFloat, local.z.toFloat, data, gain)
   }
 
   def play(x: Float, y: Float, z: Float, pattern: String, frequencyInHz: Int = 1000, durationInMilliseconds: Int = 200): Unit = {

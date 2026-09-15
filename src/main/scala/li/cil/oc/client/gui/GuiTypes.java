@@ -14,6 +14,7 @@ public final class GuiTypes {
         e.register(MenuTypes.DATABASE.get(), Database::new);
         e.register(MenuTypes.DISASSEMBLER.get(), Disassembler::new);
         e.register(MenuTypes.DISK_DRIVE.get(), DiskDrive::new);
+        e.register(MenuTypes.TAPE_DRIVE.get(), TapeDrive::new);
         e.register(MenuTypes.DRONE.get(), Drone::new);
         e.register(MenuTypes.HOLO_SCREEN.get(), HoloScreen::new);
         e.register(MenuTypes.PRINTER.get(), Printer::new);

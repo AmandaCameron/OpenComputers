@@ -62,6 +62,9 @@ object OCBlocks {
   val FlatScreenFrontTier4: DeferredBlock[FlatScreen] = BLOCKS.register(Constants.BlockName.FlatScreenFrontTier4, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Four, false), Constants.BlockName.FlatScreenFrontTier4, defaultItemProps.rarity(OCRarity.LEGENDARY),"25_components"))
   val Rack: DeferredBlock[Rack] = BLOCKS.register(Constants.BlockName.Rack, () => Items.registerBlock(new Rack(defaultProps), Constants.BlockName.Rack, defaultItemProps,"10_networking"))
   val Waypoint: DeferredBlock[Waypoint] = BLOCKS.register(Constants.BlockName.Waypoint, () => Items.registerBlock(new Waypoint(defaultProps), Constants.BlockName.Waypoint, defaultItemProps,"25_components"))
+  val TapeDrive: DeferredBlock[TapeDrive] = BLOCKS.register(Constants.BlockName.TapeDrive, () => Items.registerBlock(new TapeDrive(defaultProps), Constants.BlockName.TapeDrive, defaultItemProps,"25_components"))
+  val AudioCable: DeferredBlock[AudioCable] = BLOCKS.register(Constants.BlockName.AudioCable, () => Items.registerBlock(new AudioCable(defaultProps), Constants.BlockName.AudioCable, defaultItemProps,"10_networking"))
+  val Speaker: DeferredBlock[Speaker] = BLOCKS.register(Constants.BlockName.Speaker, () => Items.registerBlock(new Speaker(defaultProps), Constants.BlockName.Speaker, defaultItemProps,"25_components"))
 
   val Microcontroller: DeferredBlock[Microcontroller] = BLOCKS.register(Constants.BlockName.Microcontroller, () => Items.registerBlock(new Microcontroller(defaultProps), Constants.BlockName.Microcontroller, new Item.Properties(),"25_components"))
   val Print: DeferredBlock[Print] = BLOCKS.register(Constants.BlockName.Print, () => Items.registerBlock(new Print(Properties.of().mapColor(MapColor.METAL).strength(1, 5).noOcclusion.dynamicShape), Constants.BlockName.Print, new Item.Properties(),"25_components"))

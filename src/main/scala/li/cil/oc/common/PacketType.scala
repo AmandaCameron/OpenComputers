@@ -116,5 +116,10 @@ object PacketType extends Enumeration {
   // Client -> Server. Sent while a tablet is held by the client's cursor.
   TabletCursorTick,
 
+  // Appended to preserve packet ordinals used by existing clients.
+  ComputronicsTone,
+  TapeDriveControl,
+  TapeAudioStart,
+
   EndOfList = Value
 }

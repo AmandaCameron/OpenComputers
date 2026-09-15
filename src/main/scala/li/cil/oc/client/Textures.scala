@@ -47,6 +47,7 @@ object Textures {
     val RobotNoScreen = L("robot_noscreen")
     val Server = L("server")
     val Slot = L("slot")
+    val TapePlayer = L("tape_player")
     val Waypoint = L("waypoint")
   }
 

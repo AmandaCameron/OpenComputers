@@ -78,6 +78,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.RobotStateRequest => onRobotStateRequest(p)
       case PacketType.ServerPower => onServerPower(p)
       case PacketType.TabletCursorTick => onTabletCursorTick(p)
+      case PacketType.TapeDriveControl => onTapeDriveControl(p)
       case PacketType.TextBufferInit => onTextBufferInit(p)
       case PacketType.WaypointLabel => onWaypointLabel(p)
       case PacketType.HoloScreenResize => onHoloScreenResize(p)
@@ -94,6 +95,23 @@ object PacketHandler extends CommonPacketHandler {
         if (holo.resize(resizeSide)) {
           holo.getLevel.sendBlockUpdated(holo.getBlockPos, holo.getBlockState, holo.getBlockState, 3)
         }
+      case _ =>
+    }
+  }
+
+  def onTapeDriveControl(p: PacketParser): Unit = {
+    val containerId = p.readInt()
+    val action = p.readByte().toInt
+    p.player match {
+      case player: ServerPlayer if player.containerMenu.containerId == containerId && player.containerMenu.stillValid(player) =>
+        player.containerMenu match {
+          case drive: menu.TapeDrive => drive.otherInventory match {
+            case tape: li.cil.oc.common.blockentity.TapeDrive => tape.handleControl(action, player)
+            case _ => logForgedPacket(player)
+          }
+          case _ => logForgedPacket(player)
+        }
+      case player: ServerPlayer => logForgedPacket(player)
       case _ =>
     }
   }

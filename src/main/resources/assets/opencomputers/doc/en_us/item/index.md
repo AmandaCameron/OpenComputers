@@ -20,6 +20,7 @@ Keep in mind that some of these may not be available, depending on the recipe se
 
 ### Cards
 * [AbstractBus Card](abstractbuscard.md)
+* [Audio Card](audiocard1.md)
 * [Data Card](datacard1.md)
 * [Debug Card](debugCard.md) (aka ami)
 * [Graphics Card](graphicscard1.md)
@@ -67,6 +68,7 @@ Keep in mind that some of these may not be available, depending on the recipe se
 * [CPU](cpu1.md)
 * [EEPROM](eeprom.md)
 * [Floppy](floppy.md)
+* [Cassette Tape](tape.md)
 * [Hard Disk Drive](hdd1.md)
 * [Solid State Drive](ssd1.md)
 * [Memory (RAM)](ram1.md)

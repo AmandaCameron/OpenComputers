@@ -1,6 +1,7 @@
 package li.cil.oc.server.component
 
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import java.util
 import li.cil.oc.Constants
 import li.cil.oc.Settings
@@ -11,7 +12,6 @@ import li.cil.oc.api.machine.{Arguments, Callback, Context}
 import li.cil.oc.api.network.{EnvironmentHost, Message, Node, Visibility}
 import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.datacomponents.OCComponents
-import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.server.PacketSender
 import net.minecraft.core.HolderLookup
@@ -26,6 +26,39 @@ import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 import scala.jdk.CollectionConverters._
 
+object AudioCard {
+  // Audio packets are keyed only by handle on the client. Keep this process
+  // wide: per-card counters cause two nearby cards to overwrite each other.
+  private val nextNetworkHandle = new AtomicInteger(1)
+  private def allocateHandle(): Int = nextNetworkHandle.getAndIncrement()
+
+  /** Sends a completed mono8 stream for a block device such as a tape drive. */
+  def playPcm(host: EnvironmentHost, pcm: Array[Byte], sampleRate: Int = 12000, packetSize: Int = -1): Option[Int] = {
+    if (!Settings.get.audioCardEnablePcm || pcm.isEmpty) return None
+    val handle = allocateHandle()
+    // Computronics 1.12 sent 1024 DFPWM bytes per packet.  The client decoded
+    // each packet to 8192 MONO8 PCM bytes and queued that complete decoded
+    // packet as one OpenAL buffer.  TapeDrive passes 1024 here as the encoded
+    // packet size, so preserve that historical decoded-buffer boundary.
+    val chunkSize = math.max(1, if (packetSize > 0) packetSize * 8 else Settings.get.audioCardChunkSize)
+    PacketSender.sendAudioStart(host, handle, 0, sampleRate.max(1).min(96000), 1, org.lwjgl.openal.AL10.AL_FORMAT_MONO8, false)
+    for (offset <- pcm.indices by chunkSize) PacketSender.sendAudioChunk(host, handle, pcm.slice(offset, math.min(pcm.length, offset + chunkSize)))
+    PacketSender.sendAudioPlay(host, handle)
+    Some(handle)
+  }
+
+  /** Send the original encoded packets and let the client follow AsieLib's decode path. */
+  def playDfpwm(host: EnvironmentHost, encoded: Array[Byte], sampleRate: Int, volume: Float): Option[Int] = {
+    if (!Settings.get.audioCardEnablePcm || encoded.isEmpty) return None
+    val handle = allocateHandle()
+    PacketSender.sendTapeAudioStart(host, handle, sampleRate.max(1).min(96000), volume.max(0f).min(1f))
+    for (offset <- encoded.indices by 1024)
+      PacketSender.sendAudioChunk(host, handle, encoded.slice(offset, math.min(encoded.length, offset + 1024)))
+    PacketSender.sendAudioPlay(host, handle)
+    Some(handle)
+  }
+}
+
 class AudioCard(private val host: EnvironmentHost) extends AbstractManagedEnvironment with DeviceInfo {
   override val node: Node = Network.newNode(this, Visibility.Neighbors)
     .withComponent("audio")
@@ -34,19 +67,44 @@ class AudioCard(private val host: EnvironmentHost) extends AbstractManagedEnviro
 
   private val owners = mutable.Map.empty[String, mutable.Set[Int]]
   private val sessions = mutable.Map.empty[Int, AudioCardSession]
-  private var nextHandle = 1
+  private val synthChannels = Array.fill(8)(new SynthChannel)
+  private val synthModes = Array("square", "sine", "triangle", "sawtooth", "noise")
+  private var totalSynthVolume = 1.0
+
+  private final class SynthChannel {
+    var mode = 0
+    var frequency = 440
+    var volume = 1.0
+    var fmChannel = -1
+    var fmIntensity = 0.0
+    var amChannel = -1
+    var attack = 0
+    var decay = 0
+    var sustain = 1.0
+    var release = 0
+  }
+
+  private def synthChannel(index: Int): SynthChannel = {
+    if (index < 1 || index > synthChannels.length) throw new IllegalArgumentException("channel must be in [1, 8]")
+    synthChannels(index - 1)
+  }
+
+  private def playSynth(channel: Int, duration: Int, delay: Int = 0): Unit = {
+    val c = synthChannel(channel)
+    val fm = if (c.fmChannel >= 0) synthChannels(c.fmChannel).frequency else 0
+    val am = if (c.amChannel >= 0) synthChannels(c.amChannel).frequency else 0
+    val level = host.getEnvironmentLevel
+    if (level != null && !level.isClientSide)
+      PacketSender.sendComputronicsTone(level, host.xPosition, host.yPosition, host.zPosition, c.mode,
+        c.frequency.max(20).min(2000), duration.max(50).min(5000), delay.max(0).min(16000), c.volume * totalSynthVolume,
+        fm, c.fmIntensity, am, c.attack, c.decay, c.sustain, c.release)
+  }
 
   private def chunkSize: Int = math.max(1, Settings.get.audioCardChunkSize)
   private def bufferLimit: Int = math.max(chunkSize, Settings.get.audioCardBufferLimit)
   private def defaultSampleRate: Int = Settings.get.audioCardSampleRate
 
-  private def hostPos: BlockPosition = BlockPosition(host)
-
-  private def nextId(): Int = synchronized {
-    val id = nextHandle
-    nextHandle += 1
-    id
-  }
+  private def nextId(): Int = AudioCard.allocateHandle()
 
   private def session(handle: Int): AudioCardSession =
     sessions.getOrElse(handle, throw new IllegalArgumentException("invalid handle"))
@@ -72,6 +130,7 @@ class AudioCard(private val host: EnvironmentHost) extends AbstractManagedEnviro
       "stereo16" -- stereo, 16-bit signed little-endian (WAV stereo)
   """)
   def open(context: Context, args: Arguments): Array[AnyRef] = synchronized {
+    if (!Settings.get.audioCardEnablePcm) return result(null, "PCM streaming is disabled by the server")
     if (owners.get(context.node.address).fold(false)(_.size >= Settings.get.maxHandles)) {
       throw new IOException("too many open handles")
     }
@@ -84,6 +143,69 @@ class AudioCard(private val host: EnvironmentHost) extends AbstractManagedEnviro
     owners.getOrElseUpdate(context.node.address, mutable.Set.empty[Int]) += handle
 
     result(new AudioHandleValue(node.address, handle))
+  }
+
+  // The synthesis API deliberately lives on the existing `audio` component.
+  // OpenOS ships a `sound` compatibility module that maps the legacy names.
+  @Callback(direct = true, doc = "function():table -- available synthesizer wave modes.")
+  def modes(context: Context, args: Arguments): Array[AnyRef] = {
+    val values = mutable.Map.empty[Any, Any]
+    synthModes.zipWithIndex.foreach { case (name, index) => values(index + 1) = name; values(name) = index + 1 }
+    result(values.toMap)
+  }
+
+  @Callback(direct = true, doc = "function():number -- number of synthesizer channels.")
+  def channel_count(context: Context, args: Arguments): Array[AnyRef] = result(synthChannels.length)
+
+  @Callback(direct = true, doc = "function(volume:number):boolean -- set overall synthesizer volume.")
+  def setTotalVolume(context: Context, args: Arguments): Array[AnyRef] = { totalSynthVolume = args.checkDouble(0).max(0).min(1); result(true) }
+
+  @Callback(doc = "function(channel:number, wave:number):boolean -- set a synthesizer wave.")
+  def setWave(context: Context, args: Arguments): Array[AnyRef] = {
+    val c = synthChannel(args.checkInteger(0)); val wave = args.checkInteger(1) - 1
+    if (wave < 0 || wave >= synthModes.length) throw new IllegalArgumentException("unknown wave mode")
+    c.mode = wave; result(true)
+  }
+
+  @Callback(doc = "function(channel:number, initial:number, mask:number):boolean -- configure legacy LFSR noise.")
+  def setLFSR(context: Context, args: Arguments): Array[AnyRef] = { synthChannel(args.checkInteger(0)).mode = 4; result(true) }
+
+  @Callback(doc = "function(channel:number, frequency:number):boolean -- set a synthesizer frequency.")
+  def setFrequency(context: Context, args: Arguments): Array[AnyRef] = { synthChannel(args.checkInteger(0)).frequency = args.checkInteger(1).max(20).min(2000); result(true) }
+
+  @Callback(doc = "function(channel:number, volume:number):boolean -- set a synthesizer channel volume.")
+  def setVolume(context: Context, args: Arguments): Array[AnyRef] = { synthChannel(args.checkInteger(0)).volume = args.checkDouble(1).max(0).min(1); result(true) }
+
+  @Callback(doc = "function(channel:number, attack:number, decay:number, sustain:number, release:number):boolean -- set ADSR in milliseconds.")
+  def setADSR(context: Context, args: Arguments): Array[AnyRef] = { val c = synthChannel(args.checkInteger(0)); c.attack = args.checkInteger(1).max(0).min(5000); c.decay = args.checkInteger(2).max(0).min(5000); c.sustain = args.checkDouble(3).max(0).min(1); c.release = args.checkInteger(4).max(0).min(5000); result(true) }
+
+  @Callback(doc = "function(channel:number):boolean -- reset ADSR envelope.")
+  def resetEnvelope(context: Context, args: Arguments): Array[AnyRef] = { val c = synthChannel(args.checkInteger(0)); c.attack = 0; c.decay = 0; c.sustain = 1; c.release = 0; result(true) }
+
+  @Callback(doc = "function(channel:number, modulator:number, intensity:number):boolean -- set frequency modulation.")
+  def setFM(context: Context, args: Arguments): Array[AnyRef] = { val c = synthChannel(args.checkInteger(0)); c.fmChannel = args.checkInteger(1) - 1; synthChannel(c.fmChannel + 1); c.fmIntensity = args.checkDouble(2); result(true) }
+
+  @Callback(doc = "function(channel:number):boolean -- disable frequency modulation.")
+  def resetFM(context: Context, args: Arguments): Array[AnyRef] = { synthChannel(args.checkInteger(0)).fmChannel = -1; result(true) }
+
+  @Callback(doc = "function(channel:number, modulator:number):boolean -- set amplitude modulation.")
+  def setAM(context: Context, args: Arguments): Array[AnyRef] = { val c = synthChannel(args.checkInteger(0)); c.amChannel = args.checkInteger(1) - 1; synthChannel(c.amChannel + 1); result(true) }
+
+  @Callback(doc = "function(channel:number):boolean -- disable amplitude modulation.")
+  def resetAM(context: Context, args: Arguments): Array[AnyRef] = { synthChannel(args.checkInteger(0)).amChannel = -1; result(true) }
+
+  @Callback(doc = "function(channel:number, duration:number[, delay:number]):boolean -- play one synthesized channel; durations are milliseconds.")
+  def playSynthesized(context: Context, args: Arguments): Array[AnyRef] = { playSynth(args.checkInteger(0), args.checkInteger(1), args.optInteger(2, 0)); result(true) }
+
+  @Callback(doc = "function(table):boolean -- play up to eight frequency-duration beep pairs.")
+  def beep(context: Context, args: Arguments): Array[AnyRef] = {
+    val entries = args.checkTable(0).asScala.toSeq
+    if (entries.size > 8) return result(false, "table must not contain more than 8 frequencies")
+    entries.zipWithIndex.foreach { case ((frequency: Number, duration: Number), index) =>
+      val c = synthChannels(index); c.frequency = frequency.intValue().max(20).min(2000); c.mode = 0; c.volume = 1
+      playSynth(index + 1, (duration.doubleValue() * 1000).toInt)
+    }
+    result(true)
   }
 
   @Callback(direct = true, doc = "function(handle:userdata, pcm:string):boolean -- append raw PCM bytes to the handle buffer.")
@@ -112,7 +234,7 @@ class AudioCard(private val host: EnvironmentHost) extends AbstractManagedEnviro
 
     s.startPlayback()
 
-    PacketSender.sendAudioStart(host, handle, s.channel, s.sampleRate, s.channels, s.format, s.loop, hostPos)
+    PacketSender.sendAudioStart(host, handle, s.channel, s.sampleRate, s.channels, s.format, s.loop)
 
     val pcm = s.pcm
     var off = 0

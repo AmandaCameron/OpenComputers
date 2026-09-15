@@ -199,6 +199,7 @@ object EventHandler {
   @OnlyIn(Dist.CLIENT)
   def clientLoggedIn(e: ClientPlayerNetworkEvent.LoggingIn): Unit = {
     li.cil.oc.client.PacketHandler.clearPendingProjectorFrames()
+    li.cil.oc.client.PacketHandler.stopAllAudio()
     PetRenderer.isInitialized = false
     PetRenderer.hidden.clear()
     Loot.resetDisksForClient()
@@ -206,6 +207,13 @@ object EventHandler {
     Loot.disksForCyclingClient ++= Loot.disksForCyclingServer.map(_.copy())
     Loot.eepromsForClient.clear()
 
+    client.Sound.stopAll()
+  }
+
+  @SubscribeEvent
+  @OnlyIn(Dist.CLIENT)
+  def clientLoggedOut(e: ClientPlayerNetworkEvent.LoggingOut): Unit = {
+    li.cil.oc.client.PacketHandler.stopAllAudio()
     client.Sound.stopAll()
   }
 
@@ -374,29 +382,31 @@ object EventHandler {
   def onWorldUnload(e: LevelEvent.Unload): Unit = this.synchronized {
     val level = e.getLevel
 
-    if (!level.isClientSide) {
-      val serverLevel = level.asInstanceOf[ServerLevel]
+    if (level.isClientSide) {
+      li.cil.oc.client.PacketHandler.stopAllAudio()
+      TerminalServer.loaded.clear()
+      return
+    }
 
-      val chunkMap = serverLevel.getChunkSource.chunkMap
-      chunkMap.getChunks.asScala.foreach { holder =>
-        val chunk = holder.getTickingChunk
-        if (chunk != null) {
-          chunk.getBlockEntities.values().asScala.foreach {
-            case te: blockentity.traits.BaseBlockEntity => te.dispose()
-            case _ =>
-          }
+    val serverLevel = level.asInstanceOf[ServerLevel]
+
+    val chunkMap = serverLevel.getChunkSource.chunkMap
+    chunkMap.getChunks.asScala.foreach { holder =>
+      val chunk = holder.getTickingChunk
+      if (chunk != null) {
+        chunk.getBlockEntities.values().asScala.foreach {
+          case te: blockentity.traits.BaseBlockEntity => te.dispose()
+          case _ =>
         }
       }
-
-      serverLevel.getAllEntities.asScala.foreach {
-        case host: MachineHost => host.machine.stop()
-        case _ =>
-      }
-
-      Callbacks.clear()
-    } else {
-      TerminalServer.loaded.clear()
     }
+
+    serverLevel.getAllEntities.asScala.foreach {
+      case host: MachineHost => host.machine.stop()
+      case _ =>
+    }
+
+    Callbacks.clear()
   }
 
   @SubscribeEvent

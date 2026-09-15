@@ -65,6 +65,21 @@ public final class BlockEntityTypes {
                     .of(DiskDrive::new, OCBlocks.DiskDrive().get())
                     .build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TapeDrive>> TAPE_DRIVE =
+            BLOCK_ENTITY_TYPES.register("tape_drive", () -> BlockEntityType.Builder
+                    .of(TapeDrive::new, OCBlocks.TapeDrive().get())
+                    .build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AudioCable>> AUDIO_CABLE =
+            BLOCK_ENTITY_TYPES.register("audio_cable", () -> BlockEntityType.Builder
+                    .of(AudioCable::new, OCBlocks.AudioCable().get())
+                    .build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<Speaker>> SPEAKER =
+            BLOCK_ENTITY_TYPES.register("speaker", () -> BlockEntityType.Builder
+                    .of(Speaker::new, OCBlocks.Speaker().get())
+                    .build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<Geolyzer>> GEOLYZER =
             BLOCK_ENTITY_TYPES.register("geolyzer", () -> BlockEntityType.Builder
                     .of(Geolyzer::new, OCBlocks.Geolyzer().get())

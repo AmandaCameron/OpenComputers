@@ -64,6 +64,9 @@ object Constants {
     final val Rack = "rack"
     final val Transposer = "transposer"
     final val Waypoint = "waypoint"
+    final val TapeDrive = "tape_drive"
+    final val AudioCable = "audio_cable"
+    final val Speaker = "speaker"
 
     def Case(tier: Int): String = ItemUtils.caseNameWithTierSuffix("case", tier)
   }
@@ -80,6 +83,12 @@ object Constants {
     final val APUTier3 = "apu3"
     final val ArrowKeys = "arrowkeys"
     final val AudioCardTier1 = "audiocard1"
+    final val Tape = "tape"
+    final val TapeCopper = "tape_copper"
+    final val TapeGold = "tape_gold"
+    final val TapeDiamond = "tape_diamond"
+    final val TapeNetherStar = "tape_nether_star"
+    final val TapeSteel = "tape_steel"
     final val BatteryUpgradeTier1 = "batteryupgrade1"
     final val BatteryUpgradeTier2 = "batteryupgrade2"
     final val BatteryUpgradeTier3 = "batteryupgrade3"

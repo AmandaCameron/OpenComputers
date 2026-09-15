@@ -53,6 +53,10 @@ public final class MenuTypes {
             MENU.register("disk_drive", () -> IMenuTypeExtension.create(
                     (id, plr, buff) -> new DiskDrive(id, plr, new SimpleContainer(1))));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<TapeDrive>> TAPE_DRIVE =
+            MENU.register("tape_drive", () -> IMenuTypeExtension.create(
+                    (id, plr, buff) -> new TapeDrive(id, plr, new SimpleContainer(1))));
+
     public static final DeferredHolder<MenuType<?>, MenuType<HoloScreen>> HOLO_SCREEN =
             MENU.register("holo_screen", () -> IMenuTypeExtension.create(
                     (id, plr, buff) -> new HoloScreen(id, plr, new SimpleContainer(1))));
@@ -136,6 +140,10 @@ public final class MenuTypes {
 
     public static void openDiskDriveGui(ServerPlayer player, li.cil.oc.common.blockentity.DiskDrive diskDrive) {
         player.openMenu(diskDrive);
+    }
+
+    public static void openTapeDriveGui(ServerPlayer player, li.cil.oc.common.blockentity.TapeDrive tapeDrive) {
+        player.openMenu(tapeDrive);
     }
 
     public static void openDiskDriveGui(ServerPlayer player, li.cil.oc.server.component.DiskDriveMountable diskDrive) {

@@ -462,6 +462,12 @@ object OCItems extends ItemAPI {
 
   // 1.9
   val AudioCardTier1: DeferredItem[item.AudioCard] = registerItem(new item.AudioCard(defaultProps), Constants.ItemName.AudioCardTier1, Constants.SectionName.Component)
+  val Tape: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 1024 * 1024), Constants.ItemName.Tape, Constants.SectionName.Component)
+  val TapeCopper: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 4096 * 60 * 4), Constants.ItemName.TapeCopper, Constants.SectionName.Component)
+  val TapeGold: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 4096 * 60 * 8), Constants.ItemName.TapeGold, Constants.SectionName.Component)
+  val TapeDiamond: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 4096 * 60 * 16), Constants.ItemName.TapeDiamond, Constants.SectionName.Component)
+  val TapeNetherStar: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 4096 * 60 * 32), Constants.ItemName.TapeNetherStar, Constants.SectionName.Component)
+  val TapeSteel: DeferredItem[item.Tape] = registerItem(new item.Tape(defaultProps.stacksTo(1), 4096 * 60 * 8), Constants.ItemName.TapeSteel, Constants.SectionName.Component)
   /////////////////////////////////////////////////////////////////
   // Upgrade components.
   /////////////////////////////////////////////////////////////////

@@ -347,6 +347,7 @@
   "oc:tooltip.projector": "A 320x200 framebuffer projector with a toggleable native 160x50 screen mode. Use a wrench to switch modes; place a keyboard beside it for screen input.",
   "oc:tooltip.linkedcard": "These are crafted in pairs, and can only communicate with their partner card. However, they can communicate across any distance, and even across dimensions. The energy required to send a message is fairly high, though.",
   "oc:tooltip.linkedcard_channel": "§8Channel: %s§7",
+  "oc:tooltip.tape_length": "Length: %s minutes",
   "oc:tooltip.manual": "All the information you could possibly need about OpenComputers. And more. For the unbelievably low price of... §oplease press R to continue§7.",
   "oc:tooltip.memory": "Required to get computers to run. The more you have, the more complex the programs you can run.",
   "oc:tooltip.creativememory": "Required to get computers to run. It has §l§o§cI§6n§ef§ai§bn§di§ct§6e§r capacity.",
@@ -550,5 +551,14 @@
   "gui.openprinter.status.blocked.7": "Load empty maps",
   "gui.openprinter.status.blocked.8": "Load a writable book",
   "entity.opencomputers.villager.it_nerd": "Old IT Nerd (she/her)",
-  "entity.minecraft.villager.opencomputers.it_nerd": "Old IT Nerd"
+  "entity.minecraft.villager.opencomputers.it_nerd": "Old IT Nerd",
+  "blockentity.oc.tape_drive": "Tape Drive",
+  "blockentity.oc.audio_cable": "Audio Cable",
+  "blockentity.oc.speaker": "Speaker",
+  "item.oc.tape": "Cassette Tape",
+  "item.oc.tape_copper": "Copper Cassette Tape",
+  "item.oc.tape_gold": "Gold Cassette Tape",
+  "item.oc.tape_diamond": "Diamond Cassette Tape",
+  "item.oc.tape_nether_star": "Nether Star Cassette Tape",
+  "item.oc.tape_steel": "Steel Cassette Tape"
 }

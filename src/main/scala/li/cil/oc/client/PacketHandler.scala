@@ -69,6 +69,16 @@ object PacketHandler extends CommonPacketHandler {
     applyPendingProjectorFrames()
   }
 
+  /** Stop and release every client-side OpenAL stream during a world/session transition. */
+  def stopAllAudio(): Unit = audioSessions.synchronized {
+    val sessions = audioSessions.values.toSeq
+    audioSessions.clear()
+    sessions.foreach { session =>
+      session.stop()
+      session.cleanup()
+    }
+  }
+
   def clearPendingProjectorFrames(): Unit = pendingProjectorFrames.synchronized {
     pendingProjectorFrames.clear()
   }
@@ -118,6 +128,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.AudioStop   => onAudioStop(p)
       case PacketType.AudioClose  => onAudioClose(p)
       case PacketType.AudioSetLoop => onAudioSetLoop(p)
+      case PacketType.TapeAudioStart => onTapeAudioStart(p)
       case PacketType.ChargerState => onChargerState(p)
       case PacketType.ClientLog => onClientLog(p)
       case PacketType.Clipboard => onClipboard(p)
@@ -176,6 +187,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.SoundEffect => onSoundEffect(p)
       case PacketType.Sound => onSound(p)
       case PacketType.SoundPattern => onSoundPattern(p)
+      case PacketType.ComputronicsTone => onComputronicsTone(p)
       case PacketType.TransposerActivity => onTransposerActivity(p)
       case PacketType.WaypointLabel => onWaypointLabel(p)
       case _ => // Invalid packet.
@@ -189,12 +201,42 @@ object PacketHandler extends CommonPacketHandler {
     val channels = p.readInt()
     val format = p.readInt()
     val loop = p.readBoolean()
-    val pos = p.readBlockPosCoords()
+    val pos = new Vec3(p.readDouble(), p.readDouble(), p.readDouble())
+
+    OpenComputers.log.info(s"Audio stream start: handle=$handle, sampleRate=$sampleRate, channels=$channels, format=$format, loop=$loop")
 
     val s = new AudioSession(handle, channel, sampleRate, channels, format, pos)
     s.loop = loop
     audioSessions.synchronized {
       audioSessions(handle) = s
+    }
+  }
+
+  def onTapeAudioStart(p: PacketParser): Unit = {
+    val handle = p.readInt()
+    val sampleRate = p.readInt()
+    val volume = p.readFloat()
+    val pos = new Vec3(p.readDouble(), p.readDouble(), p.readDouble())
+
+    OpenComputers.log.info(s"Tape audio stream start: handle=$handle, sampleRate=$sampleRate, volume=$volume")
+
+    val session = new AudioSession(handle, 0, sampleRate, 1, org.lwjgl.openal.AL10.AL_FORMAT_MONO8,
+      pos, encodedDfpwm = true, streamGain = volume)
+    audioSessions.synchronized {
+      audioSessions.remove(handle).foreach(_.cleanup())
+      audioSessions(handle) = session
+    }
+  }
+
+  def onComputronicsTone(p: PacketParser): Unit = {
+    {
+      val x = p.readDouble(); val y = p.readDouble(); val z = p.readDouble()
+      val mode = p.readUnsignedByte(); val frequency = p.readShort()
+      val duration = p.readUnsignedShort(); val delay = p.readUnsignedShort(); val volume = p.readFloat()
+      val fmFrequency = p.readUnsignedShort(); val fmIntensity = p.readFloat(); val amFrequency = p.readUnsignedShort()
+      val attack = p.readUnsignedShort(); val decay = p.readUnsignedShort(); val sustain = p.readFloat(); val release = p.readUnsignedShort()
+      Audio.playWave(x.toFloat, y.toFloat, z.toFloat, mode, frequency, duration, delay, volume,
+        fmFrequency, fmIntensity, amFrequency, attack, decay, sustain, release)
     }
   }
 
@@ -230,7 +272,10 @@ object PacketHandler extends CommonPacketHandler {
   def onAudioStop(p: PacketParser): Unit = {
     val handle = p.readInt()
     audioSessions.synchronized {
-      audioSessions.get(handle).foreach(_.stop())
+      audioSessions.remove(handle).foreach { session =>
+        session.stop()
+        session.cleanup()
+      }
     }
   }
 
